@@ -1,0 +1,143 @@
+---
+title: "Project 1"
+author: "Mina Naziri"
+date: "2023-02-16"
+output: html_document
+---
+
+In recent years, the ability to collect activity data has skyrocketed due to the prevalence of movement tracking devices. Most, if not all, users of these devices are drawn to them for health reasons, such as weight loss or maintaining mobility. However, the raw data tends to be harder to collect, and difficult to interpret. This project makes use of said data.
+
+Movement data was collected in five minute intervals throughout the day for the span of two months; October and November of 2012.
+
+The data for this assignment can be downloaded from the course web site:
+
+Dataset: [Activity monitoring data](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip)
+
+The variables included in this dataset are:
+
+steps: Number of steps taking in a 5-minute interval (missing values are coded as 𝙽𝙰) </br> date: The date on which the measurement was taken in YYYY-MM-DD format </br> interval: Identifier for the 5-minute interval in which measurement was taken </br> The dataset is stored in a comma-separated-value (CSV) file and there are a total of 17,568 observations in this dataset.
+
+
+Loading the Data
+----------------
+
+Unzipped the data to get the CSV file.
+
+```(r)
+library(data.table)
+library(ggplot2)
+
+fileUrl <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip"
+download.file(fileUrl, destfile = paste0(getwd(), '/repdata%2Fdata%2Factivity.zip'), method = "curl")
+unzip("repdata%2Fdata%2Factivity.zip",exdir = "data")
+```
+
+Reading CSV Data
+----------------
+
+```(r)
+activityDT <- data.table::fread(input = "data/activity.csv")
+```
+
+Finding the mean of total steps taken per day
+---------------------------------------------
+
+Finding the total steps taken per day
+
+```(r)
+TotalSteps <- activityDT[, c(lapply(.SD, sum, na.rm = FALSE)), .SDcols = c("steps"), by = .(date)] head(Total_Steps, 10)
+```
+  ##           date steps
+    ##  1: 2012-10-01    NA
+    ##  2: 2012-10-02   126
+    ##  3: 2012-10-03 11352
+    ##  4: 2012-10-04 12116
+    ##  5: 2012-10-05 13294
+    ##  6: 2012-10-06 15420
+    ##  7: 2012-10-07 11015
+    ##  8: 2012-10-08    NA
+    ##  9: 2012-10-09 12811
+    ## 10: 2012-10-10  9900
+    
+Making a histogram of the total number of steps taken each day.
+
+```(r)
+ggplot(TotalSteps, aes(x = steps)) +
+  geom_histogram(fill = "blue", binwidth = 1000) +
+    labs(title = "Daily Steps", x = "Steps", y = "Frequency")
+```
+Calculating the mean and median of the total number of steps taken per day
+
+```
+Total_Steps[, .(Mean_Steps = mean(steps, na.rm = TRUE), Median_Steps = median(steps, na.rm = TRUE))]
+```
+## Answer is 10766.19        10765
+
+Finding the daily average activity pattern
+
+```
+IntervalDT <- activityDT[, c(lapply(.SD, mean, na.rm = TRUE)), .SDcols = c("steps"), by = .(interval)] 
+
+ggplot(IntervalDT, aes(x = interval , y = steps)) + geom_line(color="blue", size=1) + labs(title = "Avg. Daily Steps", x = "Interval", y = "Avg. Steps per day")
+```
+Finding which five-minute interval on average contains the most steps, across all days in the dataset
+
+```
+IntervalDT[steps == max(steps), .(max_interval = interval)]
+```
+## Answer is 835
+
+Finding the number of missing values
+
+```
+activityDT[is.na(steps), .N ]
+```
+## Answer is 2304
+
+Filling in missing values with the median of the dataset. 
+```
+activityDT[is.na(steps), "steps"] <- activityDT[, c(lapply(.SD, median, na.rm = TRUE)), .SDcols = c("steps")]
+```
+Creating a new dataset with the missing values filled in
+
+```
+data.table::fwrite(x = activityDT, file = "data/tidyData.csv", quote = FALSE)
+```
+Checking the impact of missing values through re-making the original histogram, but with the missing values filled in
+
+```
+Total_Steps <- activityDT[, c(lapply(.SD, sum)), .SDcols = c("steps"), by = .(date)] 
+
+Total_Steps[, .(Mean_Steps = mean(steps), Median_Steps = median(steps))]
+```
+Mean_Steps Median_Steps
+    9354.23        10395
+    
+```
+ggplot(Total_Steps, aes(x = steps)) + geom_histogram(fill = "blue", binwidth = 1000) + labs(title = "Daily Steps", x = "Steps", y = "Frequency")
+```
+
+Finding differences in activity patterns between weekdays and weekends
+```
+# Just recreating activityDT from scratch then making the new factor variable. (No need to, just want to be clear on what the entire process is.) 
+activityDT <- data.table::fread(input = "data/activity.csv")
+activityDT[, date := as.POSIXct(date, format = "%Y-%m-%d")]
+activityDT[, `Day of Week`:= weekdays(x = date)]
+activityDT[grepl(pattern = "Monday|Tuesday|Wednesday|Thursday|Friday", x = `Day of Week`), "weekday or weekend"] <- "weekday"
+activityDT[grepl(pattern = "Saturday|Sunday", x = `Day of Week`), "weekday or weekend"] <- "weekend"
+activityDT[, `weekday or weekend` := as.factor(`weekday or weekend`)]
+head(activityDT, 10)
+```
+
+Creating a time-series plot
+```
+activityDT[is.na(steps), "steps"] <- activityDT[, c(lapply(.SD, median, na.rm = TRUE)), .SDcols = c("steps")]
+IntervalDT <- activityDT[, c(lapply(.SD, mean, na.rm = TRUE)), .SDcols = c("steps"), by = .(interval, `weekday or weekend`)] 
+
+ggplot(IntervalDT , aes(x = interval , y = steps, color=`weekday or weekend`)) + geom_line() + labs(title = "Avg. Daily Steps by Weektype", x = "Interval", y = "No. of Steps") + facet_wrap(~`weekday or weekend` , ncol = 1, nrow=2)
+```
+
+
+
+
+
